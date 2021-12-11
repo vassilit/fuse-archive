@@ -1,9 +1,17 @@
-PKG_CONFIG?=pkg-config
-pkgcflags=$(shell $(PKG_CONFIG) libarchive fuse --cflags)
-pkglibs=$(shell   $(PKG_CONFIG) libarchive fuse --libs)
+PKG_CONFIG ?= pkg-config
+pkgcflags = $(shell $(PKG_CONFIG) libarchive fuse --cflags)
+pkglibs = $(shell   $(PKG_CONFIG) libarchive fuse --libs)
+UNAME := $(shell uname)
 
-prefix=/usr
-bindir=$(prefix)/bin
+CXXFLAGS = -O2
+
+ifeq ($(UNAME), FreeBSD)
+prefix = /usr/local
+CXXFLAGS += -Wl,-rpath=/usr/local/lib/gcc10
+else
+prefix = /usr
+endif
+bindir = $(prefix)/bin
 
 all: out/fuse-archive
 
