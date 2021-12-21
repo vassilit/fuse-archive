@@ -115,7 +115,7 @@
 
 // ---- Platform specifics
 
-#if defined(__FreeBSD__) || defined( __OpenBSD__ ) || defined( __APPLE__ )
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__APPLE__)
 #define lseek64 lseek
 #endif
 
@@ -159,7 +159,6 @@ static struct fuse_opt g_fuse_opts[] = {
 static const char* g_archive_filename = NULL;
 
 // g_archive_fd is the file descriptor returned by opening g_archive_filename.
-// We never close this file.
 static int g_archive_fd = -1;
 
 // g_archive_file_size is the size of the g_archive_filename file.
@@ -175,13 +174,13 @@ static int64_t g_archive_file_size = 0;
 static int64_t g_archive_fd_position_current = 0;
 static std::atomic<int64_t> g_archive_fd_position_hwm;
 
-// g_archive_path holds the canonicalised absolute path of the archive file.
-// The command line argument may give a relative filename (one that doesn't
-// start with a slash) and the fuse_main function may change the current
-// working directory, so subsequent archive_read_open_filename calls use this
-// absolute filepath instead. g_archive_filename is still used for logging.
-// *g_archive_path is allocated in pre_initialize() and never freed after.
-static const char* g_archive_path = NULL;
+// g_archive_realpath holds the canonicalised absolute path of the archive
+// file. The command line argument may give a relative filename (one that
+// doesn't start with a slash) and the fuse_main function may change the
+// current working directory, so subsequent archive_read_open_filename calls
+// use this absolute filepath instead. g_archive_filename is still used for
+// logging. g_archive_realpath is allocated in pre_initialize and never freed.
+static const char* g_archive_realpath = NULL;
 
 // g_passphrase_buffer and g_passphrase_length combine to hold the passphrase,
 // if given. The buffer is NUL-terminated but g_passphrase_length excludes the
@@ -480,6 +479,9 @@ my_file_seek(struct archive* a,
   if (g_options.asyncprogress && g_shutting_down.load()) {
     archive_set_error(a, ECANCELED, "fuse-archive: shutting down");
     return ARCHIVE_FATAL;
+  } else if (g_archive_fd < 0) {
+    archive_set_error(a, EIO, "fuse-archive: invalid g_archive_fd");
+    return ARCHIVE_FATAL;
   }
   int64_t o = lseek64(g_archive_fd, offset, whence);
   if (o >= 0) {
@@ -495,6 +497,9 @@ static int64_t  //
 my_file_skip(struct archive* a, void* callback_data, int64_t delta) {
   if (g_options.asyncprogress && g_shutting_down.load()) {
     archive_set_error(a, ECANCELED, "fuse-archive: shutting down");
+    return ARCHIVE_FATAL;
+  } else if (g_archive_fd < 0) {
+    archive_set_error(a, EIO, "fuse-archive: invalid g_archive_fd");
     return ARCHIVE_FATAL;
   }
   int64_t o0 = lseek64(g_archive_fd, 0, SEEK_CUR);
@@ -777,7 +782,7 @@ acquire_reader(int64_t want_index_within_archive) {
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
     archive_read_support_format_raw(a);
-    if (archive_read_open_filename(a, g_archive_path, BLOCK_SIZE) !=
+    if (archive_read_open_filename(a, g_archive_realpath, BLOCK_SIZE) !=
         ARCHIVE_OK) {
       fprintf(stderr, "fuse-archive: could not open %s: %s\n",
               redact(g_archive_filename), archive_error_string(a));
@@ -1187,7 +1192,8 @@ pre_initialize() {
             redact(g_archive_filename));
     return EXIT_CODE_GENERIC_FAILURE;
   }
-  if (!(g_archive_path = realpath(g_archive_filename, NULL))) {
+  g_archive_realpath = realpath(g_archive_filename, NULL);
+  if (!g_archive_realpath) {
     fprintf(stderr, "fuse-archive: error getting absolute path of %s: %s\n",
             redact(g_archive_filename), strerror(errno));
     return EXIT_CODE_GENERIC_FAILURE;
@@ -1332,6 +1338,10 @@ post_initialize_sync() {
   g_initialize_archive = nullptr;
   g_initialize_archive_entry = nullptr;
   g_initialize_index_within_archive = -1;
+  if (g_archive_fd >= 0) {
+    close(g_archive_fd);
+    g_archive_fd = -1;
+  }
   return g_initialize_status_code;
 }
 
