@@ -6,8 +6,9 @@ UNAME := $(shell uname)
 CXXFLAGS = -O2
 
 ifeq ($(UNAME), FreeBSD)
+CXX = g++11
 prefix = /usr/local
-CXXFLAGS += -Wl,-rpath=/usr/local/lib/gcc10
+CXXFLAGS += -Wl,-rpath=/usr/local/lib/gcc11
 else
 prefix = /usr
 endif
