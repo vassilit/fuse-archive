@@ -43,7 +43,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include <atomic>
 #include <chrono>
@@ -472,7 +471,7 @@ update_g_archive_fd_position_hwm() {
       fprintf(stderr, "Loading %d%%\n", percent);
       fflush(stderr);
     } else {
-      syslog(LOG_INFO, "Loading %d%%", percent);
+      printf("Loading %d%%", percent);
     }
     g_displayed_progress = true;
   }
@@ -675,10 +674,10 @@ struct reader {
       int status =
           archive_read_next_header(this->archive, &this->archive_entry);
       if (status == ARCHIVE_EOF) {
-        syslog(LOG_ERR, "inconsistent archive %s", redact(g_archive_filename));
+        fprintf(stderr, "inconsistent archive %s\n", redact(g_archive_filename));
         return false;
       } else if ((status != ARCHIVE_OK) && (status != ARCHIVE_WARN)) {
-        syslog(LOG_ERR, "invalid archive %s: %s", redact(g_archive_filename),
+        fprintf(stderr, "invalid archive %s: %s\n", redact(g_archive_filename),
                archive_error_string(this->archive));
         return false;
       }
@@ -754,11 +753,11 @@ struct reader {
   ssize_t read(void* dst_ptr, size_t dst_len, const char* pathname) {
     ssize_t n = archive_read_data(this->archive, dst_ptr, dst_len);
     if (n < 0) {
-      syslog(LOG_ERR, "could not serve %s from %s: %s", redact(pathname),
+      fprintf(stderr, "could not serve %s from %s: %s\n", redact(pathname),
              redact(g_archive_filename), archive_error_string(this->archive));
       return -EIO;
     } else if (static_cast<size_t>(n) > dst_len) {
-      syslog(LOG_ERR, "too much data serving %s from %s", redact(pathname),
+      fprintf(stderr, "too much data serving %s from %s\n", redact(pathname),
              redact(g_archive_filename));
       // Something has gone wrong, possibly a buffer overflow, so abort.
       abort();
@@ -799,7 +798,7 @@ compare(int64_t index_within_archive0,
 static std::unique_ptr<struct reader>  //
 acquire_reader(int64_t want_index_within_archive) {
   if (want_index_within_archive < 0) {
-    syslog(LOG_ERR, "negative index_within_archive");
+    fprintf(stderr, "negative index_within_archive\n");
     return nullptr;
   }
 
@@ -826,7 +825,7 @@ acquire_reader(int64_t want_index_within_archive) {
   } else {
     struct archive* a = archive_read_new();
     if (!a) {
-      syslog(LOG_ERR, "out of memory");
+      fprintf(stderr, "out of memory\n");
       return nullptr;
     }
     if (g_passphrase_length > 0) {
@@ -837,7 +836,7 @@ acquire_reader(int64_t want_index_within_archive) {
     archive_read_support_format_raw(a);
     if (archive_read_open_filename(a, g_archive_realpath, BLOCK_SIZE) !=
         ARCHIVE_OK) {
-      syslog(LOG_ERR, "could not read %s: %s", redact(g_archive_filename),
+      fprintf(stderr, "could not read %s: %s\n", redact(g_archive_filename),
              archive_error_string(a));
       archive_read_free(a);
       return nullptr;
@@ -992,7 +991,7 @@ normalize_pathname(struct archive_entry* e) {
   if (!s) {
     s = archive_entry_pathname(e);
     if (!s) {
-      syslog(LOG_ERR, "archive entry in %s has empty pathname",
+      fprintf(stderr, "archive entry in %s has empty pathname\n",
              redact(g_archive_filename));
       return "";
     }
@@ -1008,7 +1007,7 @@ normalize_pathname(struct archive_entry* e) {
   }
 
   if (!valid_pathname(s, true)) {
-    syslog(LOG_ERR, "archive entry in %s has invalid pathname: %s",
+    fprintf(stderr, "archive entry in %s has invalid pathname: %s",
            redact(g_archive_filename), redact(s));
     return "";
   }
@@ -1028,7 +1027,7 @@ insert_leaf_node(std::string&& pathname,
                  time_t mtime,
                  mode_t mode) {
   if (index_within_archive < 0) {
-    syslog(LOG_ERR, "negative index_within_archive in %s: %s",
+    fprintf(stderr, "negative index_within_archive in %s: %s\n",
            redact(g_archive_filename), redact(pathname.c_str()));
     return -EIO;
   } else {
@@ -1036,11 +1035,11 @@ insert_leaf_node(std::string&& pathname,
     if (iter == g_nodes_by_name.end()) {
       // No-op.
     } else if (S_ISDIR(iter->second->mode) == S_ISDIR(mode)) {
-      syslog(LOG_ERR, "duplicate pathname in %s: %s",
+      fprintf(stderr, "duplicate pathname in %s: %s\n",
              redact(g_archive_filename), redact(pathname.c_str()));
       return EXIT_CODE_INVALID_EXPLICIT_DUPLICATE_ENTRY;
     } else {
-      syslog(LOG_ERR, "simultaneous directory and regular file in %s: %s",
+      fprintf(stderr, "simultaneous directory and regular file in %s: %s\n",
              redact(g_archive_filename), redact(pathname.c_str()));
       return EXIT_CODE_INVALID_IMPLICIT_DUPLICATE_ENTRY;
     }
@@ -1090,7 +1089,7 @@ insert_leaf_node(std::string&& pathname,
       }
       if (g_nodes_by_index.size() >
           static_cast<uint64_t>(index_within_archive)) {
-        syslog(LOG_ERR, "index_within_archive out of order in %s: %s",
+        fprintf(stderr, "index_within_archive out of order in %s: %s\n",
                redact(g_archive_filename), redact(pathname.c_str()));
         return -EIO;
       }
@@ -1108,7 +1107,7 @@ insert_leaf_node(std::string&& pathname,
       g_nodes_by_name.insert(iter, {std::move(abs_pathname), n});
       parent = n;
     } else if (!S_ISDIR(iter->second->mode)) {
-      syslog(LOG_ERR, "simultaneous directory and regular file in %s: %s",
+      fprintf(stderr, "simultaneous directory and regular file in %s: %s\n",
              redact(g_archive_filename), redact(abs_pathname.c_str()));
       return EXIT_CODE_INVALID_IMPLICIT_DUPLICATE_ENTRY;
     } else {
@@ -1139,12 +1138,12 @@ insert_leaf(struct archive* a,
       symlink = std::string(s);
     }
     if (symlink.empty()) {
-      syslog(LOG_ERR, "empty link in %s: %s", redact(g_archive_filename),
+      fprintf(stderr, "empty link in %s: %s\n", redact(g_archive_filename),
              redact(pathname.c_str()));
       return 0;
     }
   } else if (!S_ISREG(mode)) {
-    syslog(LOG_ERR, "irregular non-link file in %s: %s",
+    fprintf(stderr, "irregular non-link file in %s: %s\n",
            redact(g_archive_filename), redact(pathname.c_str()));
     return 0;
   }
@@ -1162,11 +1161,11 @@ insert_leaf(struct archive* a,
       if (n == 0) {
         break;
       } else if (n < 0) {
-        syslog(LOG_ERR, "could not decompress %s: %s",
+        fprintf(stderr, "could not decompress %s: %s\n",
                redact(g_archive_filename), archive_error_string(a));
         return -EIO;
       } else if (n > SIDE_BUFFER_SIZE) {
-        syslog(LOG_ERR, "too much data decompressing %s",
+        fprintf(stderr, "too much data decompressing %s\n",
                redact(g_archive_filename));
         // Something has gone wrong, possibly a buffer overflow, so abort.
         abort();
@@ -1202,11 +1201,11 @@ build_tree() {
       if (status == ARCHIVE_EOF) {
         break;
       } else if (status == ARCHIVE_WARN) {
-        syslog(LOG_ERR, "libarchive warning for %s: %s",
+        fprintf(stderr, "libarchive warning for %s: %s\n",
                redact(g_archive_filename),
                archive_error_string(g_initialize_archive));
       } else if (status != ARCHIVE_OK) {
-        syslog(LOG_ERR, "invalid archive %s: %s", redact(g_archive_filename),
+        fprintf(stderr, "invalid archive %s: %s\n", redact(g_archive_filename),
                archive_error_string(g_initialize_archive));
         return -EIO;
       }
@@ -1237,7 +1236,7 @@ read_passphrase_from_stdin() {
       if (errno == EINTR) {
         continue;
       }
-      syslog(LOG_ERR, "could not read passphrase from stdin: %m");
+      fprintf(stderr, "could not read passphrase from stdin: %m\n");
       return -errno;
     } else if (n == 0) {
       g_passphrase_buffer[g_passphrase_length] = '\x00';
@@ -1255,7 +1254,7 @@ read_passphrase_from_stdin() {
     }
     g_passphrase_length = j;
   }
-  syslog(LOG_ERR, "passphrase was too long");
+  fprintf(stderr, "passphrase was too long\n");
   return -EIO;
 }
 
@@ -1269,26 +1268,26 @@ insert_root_node() {
 static int  //
 pre_initialize() {
   if (!g_archive_filename) {
-    syslog(LOG_ERR, "missing archive_filename argument");
+    fprintf(stderr, "missing archive_filename argument\n");
     return EXIT_CODE_GENERIC_FAILURE;
   }
 
   g_archive_realpath = realpath(g_archive_filename, NULL);
   if (!g_archive_realpath) {
-    syslog(LOG_ERR, "could not get absolute path of %s: %m",
+    fprintf(stderr, "could not get absolute path of %s: %m\n",
            redact(g_archive_filename));
     return EXIT_CODE_CANNOT_OPEN_ARCHIVE;
   }
 
   g_archive_fd = open(g_archive_realpath, O_RDONLY);
   if (g_archive_fd < 0) {
-    syslog(LOG_ERR, "could not open %s: %m", redact(g_archive_filename));
+    fprintf(stderr, "could not open %s: %m\n", redact(g_archive_filename));
     return EXIT_CODE_CANNOT_OPEN_ARCHIVE;
   }
 
   struct stat z;
   if (fstat(g_archive_fd, &z) != 0) {
-    syslog(LOG_ERR, "could not stat %s", redact(g_archive_filename));
+    fprintf(stderr, "could not stat %s\n", redact(g_archive_filename));
     return EXIT_CODE_GENERIC_FAILURE;
   }
   g_archive_file_size = z.st_size;
@@ -1299,7 +1298,7 @@ pre_initialize() {
 
   g_initialize_archive = archive_read_new();
   if (!g_initialize_archive) {
-    syslog(LOG_ERR, "out of memory");
+    fprintf(stderr, "out of memory\n");
     return EXIT_CODE_GENERIC_FAILURE;
   }
   if (g_passphrase_length > 0) {
@@ -1309,7 +1308,7 @@ pre_initialize() {
   archive_read_support_format_all(g_initialize_archive);
   archive_read_support_format_raw(g_initialize_archive);
   if (my_archive_read_open(g_initialize_archive) != ARCHIVE_OK) {
-    syslog(LOG_ERR, "could not open %s: %s", redact(g_archive_filename),
+    fprintf(stderr, "could not open %s: %s\n", redact(g_archive_filename),
            archive_error_string(g_initialize_archive));
     archive_read_free(g_initialize_archive);
     g_initialize_archive = nullptr;
@@ -1323,12 +1322,12 @@ pre_initialize() {
                                           &g_initialize_archive_entry);
     g_initialize_index_within_archive++;
     if (status == ARCHIVE_WARN) {
-      syslog(LOG_ERR, "libarchive warning for %s: %s",
+      fprintf(stderr, "libarchive warning for %s: %s\n",
              redact(g_archive_filename),
              archive_error_string(g_initialize_archive));
     } else if (status != ARCHIVE_OK) {
       if (status != ARCHIVE_EOF) {
-        syslog(LOG_ERR, "invalid archive %s: %s", redact(g_archive_filename),
+        fprintf(stderr, "invalid archive %s: %s\n", redact(g_archive_filename),
                archive_error_string(g_initialize_archive));
       }
       archive_read_free(g_initialize_archive);
@@ -1361,7 +1360,7 @@ pre_initialize() {
         g_initialize_archive = nullptr;
         g_initialize_archive_entry = nullptr;
         g_initialize_index_within_archive = -1;
-        syslog(LOG_ERR, "invalid raw archive: %s", redact(g_archive_filename));
+        fprintf(stderr, "invalid raw archive: %s\n", redact(g_archive_filename));
         return EXIT_CODE_INVALID_RAW_ARCHIVE;
       } else if (archive_filter_code(g_initialize_archive, i) !=
                  ARCHIVE_FILTER_NONE) {
@@ -1377,7 +1376,7 @@ pre_initialize() {
         g_side_buffer_data[SIDE_BUFFER_INDEX_DECOMPRESSED], 1);
     if (n < 0) {
       const char* const e = archive_error_string(g_initialize_archive);
-      syslog(LOG_ERR, "%s: %s", redact(g_archive_filename), e);
+      fprintf(stderr, "%s: %s\n", redact(g_archive_filename), e);
       const int ret = determine_passphrase_exit_code(e);
       archive_read_free(g_initialize_archive);
       g_initialize_archive = nullptr;
@@ -1415,7 +1414,7 @@ post_initialize_sync() {
       fprintf(stderr, "\e[F\e[K");
       fflush(stderr);
     } else {
-      syslog(LOG_INFO, "Loaded 100%%");
+      printf("Loaded 100%%");
     }
   }
   return g_initialize_status_code;
@@ -1756,12 +1755,12 @@ my_opt_proc(void* private_data,
         arg++;
       }
       if (!valid_pathname(arg, false) || (*arg == '\x00')) {
-        syslog(LOG_ERR, "invalid --asyncprogress=etc pathname");
+        fprintf(stderr, "invalid --asyncprogress=etc pathname\n");
         return error;
       }
       g_options.asyncprogress = strdup(arg);
       if (!g_options.asyncprogress) {
-        syslog(LOG_ERR, "out of memory");
+        fprintf(stderr, "out of memory\n");
         return error;
       }
       return discard;
@@ -1769,7 +1768,6 @@ my_opt_proc(void* private_data,
       g_options.passphrase = true;
       return discard;
     case MY_KEY_QUIET:
-      setlogmask(LOG_UPTO(LOG_ERR));
       g_options.quiet = true;
       return discard;
     case MY_KEY_REDACT:
@@ -1810,15 +1808,12 @@ ensure_utf_8_encoding() {
     }
   }
 
-  syslog(LOG_ERR, "could not ensure UTF-8 encoding");
+  fprintf(stderr, "could not ensure UTF-8 encoding\n");
   return EXIT_CODE_GENERIC_FAILURE;
 }
 
 int  //
 main(int argc, char** argv) {
-  openlog(PROGRAM_NAME, LOG_PERROR, LOG_USER);
-  setlogmask(LOG_UPTO(LOG_INFO));
-
   // Initialize side buffers as invalid.
   for (int i = 0; i < NUM_SIDE_BUFFERS; i++) {
     g_side_buffer_metadata[i].index_within_archive = -1;
@@ -1831,10 +1826,10 @@ main(int argc, char** argv) {
 
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
   if ((argc <= 0) || !argv) {
-    syslog(LOG_ERR, "missing command line arguments");
+    fprintf(stderr, "missing command line arguments\n");
     return EXIT_CODE_GENERIC_FAILURE;
   } else if (fuse_opt_parse(&args, &g_options, g_fuse_opts, &my_opt_proc) < 0) {
-    syslog(LOG_ERR, "could not parse command line arguments");
+    fprintf(stderr, "could not parse command line arguments\n");
     return EXIT_CODE_GENERIC_FAILURE;
   }
 
