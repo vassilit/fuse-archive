@@ -1106,7 +1106,22 @@ struct Reader : bi::list_base_hook<LinkMode> {
 #endif
 
     Check(archive_read_support_filter_all(archive.get()));
-    Check(archive_read_support_format_all(archive.get()));
+    // archive_read_support_format_all without mtree:
+    archive_read_support_format_ar(archive.get());
+    archive_read_support_format_cpio(archive.get());
+    archive_read_support_format_empty(archive.get());
+    archive_read_support_format_lha(archive.get());
+    archive_read_support_format_tar(archive.get());
+    archive_read_support_format_xar(archive.get());
+    archive_read_support_format_warc(archive.get());
+    archive_read_support_format_7zip(archive.get());
+    archive_read_support_format_cab(archive.get());
+    archive_read_support_format_rar(archive.get());
+    archive_read_support_format_rar5(archive.get());
+    archive_read_support_format_iso9660(archive.get());
+    archive_read_support_format_zip(archive.get());
+    archive_clear_error(archive.get());
+
     Check(archive_read_support_format_raw(archive.get()));
 
     Check(archive_read_set_callback_data(archive.get(), this));
