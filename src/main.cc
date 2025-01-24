@@ -232,8 +232,10 @@ i64 g_archive_size = 0;
 // Decryption password.
 std::string g_password;
 
+#if 0
 // Number of times the decryption password has been requested.
 int g_password_count = 0;
+#endif
 
 // Has the password been actually checked yet?
 bool g_password_checked = false;
@@ -975,6 +977,7 @@ struct ArchiveDeleter {
 
 using ArchivePtr = std::unique_ptr<Archive, ArchiveDeleter>;
 
+#if 0
 // Read a password from the standard input if necessary.
 const char* ReadPassword(Archive*, void*) {
   if (g_password_count++) {
@@ -1011,6 +1014,7 @@ const char* ReadPassword(Archive*, void*) {
   LOG(DEBUG) << "Got a password of " << g_password.size() << " bytes";
   return g_password.c_str();
 }
+#endif
 
 // ---- Side Buffer
 
@@ -1087,12 +1091,14 @@ struct Reader : bi::list_base_hook<LinkMode> {
       throw std::bad_alloc();
     }
 
+#if 0
     if (g_password.empty()) {
       Check(archive_read_set_passphrase_callback(archive.get(), nullptr,
                                                  &ReadPassword));
     } else {
       Check(archive_read_add_passphrase(archive.get(), g_password.c_str()));
     }
+#endif
 
     Check(archive_read_support_filter_all(archive.get()));
     Check(archive_read_support_format_all(archive.get()));
