@@ -2802,7 +2802,11 @@ def TestFuseErrors():
             LogError("Missing a/b/d/file2 in multi-archive mount")
 
 
+gpg_home = None
 if has_gpg:
+    gpg_home = tempfile.TemporaryDirectory()
+    os.environ['GNUPGHOME'] = gpg_home.name
+    env['GNUPGHOME'] = gpg_home.name
     b = b' BLOCK'
     k = b' KEY'
     p = b' PGP'
@@ -2834,11 +2838,14 @@ try:
     TestFilteredZip()
     TestFilteredOpaque()
 finally:
-    if has_gpg:
-        subprocess.run([
-            'gpg', '--batch', '--yes', '--delete-secret-and-public-key',
-            '7D74961702BCAD35D591BB896EC5AAD2CC5FEC0E'
-        ])
+    if gpg_home:
+        try:
+            subprocess.run(['gpgconf', '--kill', 'gpg-agent'], check=False)
+        except FileNotFoundError:
+            pass
+        gpg_home.cleanup()
+        os.environ.pop('GNUPGHOME', None)
+        env.pop('GNUPGHOME', None)
 
 TestHardlinks()
 TestHardlinks(['-o', 'nocache'])
