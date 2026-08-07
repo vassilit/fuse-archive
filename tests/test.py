@@ -277,7 +277,7 @@ has_tar = CanRun(['tar', '--version'])
 
 
 def HasLib(name):
-    if ' ' + name + '/' in sr.stdout:
+    if ' ' + name in sr.stdout:
         return True
     logging.info(f'Will skip tests relying on {name}')
     return False
@@ -290,6 +290,7 @@ has_libzstd = HasLib('libzstd')
 has_zlib = HasLib('zlib')
 has_nettle = HasLib('nettle')
 has_openssl = HasLib('openssl')
+has_rpm = HasLib('rpm')
 
 # https://github.com/google/fuse-archive/issues/59
 env = os.environ.copy()
@@ -454,7 +455,7 @@ def TestArchiveWithOptions(options=[]):
         MountArchiveAndCheckTree(zip_name, want_tree, options=options)
 
     want_tree = {
-        '.': {'ino': 1, 'mode': 'drwxr-xr-x', 'nlink': 4},
+        '.': {'mode': 'drwxr-xr-x', 'nlink': 4},
         'artificial': {'mode': 'drwxr-xr-x'},
         'artificial/0.bytes': {'mode': '-rw-r--r--', 'mtime': 1580883024000000000, 'size': 0, 'md5': 'd41d8cd98f00b204e9800998ecf8427e'},
         'github-tags.json': {'mode': '-rw-r--r--', 'mtime': 1597241062000000000, 'size': 853, 'md5': 'b2d7993ed99c65296bf95824c57b4fdc'},
@@ -533,6 +534,9 @@ def TestArchiveWithOptions(options=[]):
 
     if has_gpg:
         zip_names += ['archive.tar.gpg', 'archive.tar.pgp', 'archive.tar.asc']
+
+    if has_rpm:
+        zip_names += ['real.rpm']
 
     for zip_name in zip_names:
         MountArchiveAndCheckTree(zip_name, want_tree, options=options)

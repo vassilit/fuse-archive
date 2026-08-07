@@ -398,7 +398,11 @@ int main(int const argc, char** const argv) try {
 
   if (ctx.version) {
     std::cout << PROGRAM_NAME " " PROGRAM_VERSION "\n";
-    std::cout << archive_version_details() << "\n";
+    std::cout << archive_version_details();
+#ifdef ARCHIVE_FORMAT_RPM
+    std::cout << " rpm";
+#endif
+    std::cout << "\n";
     std::cout.flush();
 
     // Forward --version to libfuse so that it can print its own version.
