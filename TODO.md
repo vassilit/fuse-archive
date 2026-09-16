@@ -76,3 +76,10 @@
 - [x] Add test for SGID, SUID and SVTX bits with `-o default_permissions`.
 - [x] Add a `-o memcache` option.
 - [x] Fix the FUSE version detection in the tests
+- [ ] Improve handling of zero or missing timestamps.
+- [ ] Handle btime timestamps.
+- [ ] Improve tests for RPM format.
+- [ ] Keep track of access time (atime) of each file.
+- [ ] Add a `-o noatime` option.
+- [ ] Add a `USE_LIBZIP` build flag.
+- [ ] Handle ZIP archives with `libzip` instead of `libarchive` if `USE_LIBZIP` is enabled.
