@@ -93,6 +93,38 @@ Segments GetSegments(std::string_view const path) {
   return segments;
 }
 
+// Sets |node|'s mtime, atime and ctime from the given archive |entry|.
+//
+// If the entry doesn't carry an mtime, |fallback_mtime| is used instead
+// (normally the archive file's own mtime). A zero mtime coming from the
+// entry itself is kept as is, since some archivers set it on purpose (e.g.
+// for reproducible builds).
+//
+// A missing or zero atime or ctime is replaced by the node's own mtime.
+// Unlike mtime, these are essentially never meaningfully set to the Unix
+// epoch on purpose: it's just a sign that the archive format or writer
+// doesn't track them.
+void SetTimestamps(Node* const node,
+                   Entry* const entry,
+                   const timespec& fallback_mtime) {
+  node->mtime = archive_entry_mtime_is_set(entry)
+                    ? timespec{.tv_sec = archive_entry_mtime(entry),
+                               .tv_nsec = archive_entry_mtime_nsec(entry)}
+                    : fallback_mtime;
+
+  node->atime =
+      archive_entry_atime_is_set(entry) && archive_entry_atime(entry) != 0
+          ? timespec{.tv_sec = archive_entry_atime(entry),
+                     .tv_nsec = archive_entry_atime_nsec(entry)}
+          : node->mtime;
+
+  node->ctime =
+      archive_entry_ctime_is_set(entry) && archive_entry_ctime(entry) != 0
+          ? timespec{.tv_sec = archive_entry_ctime(entry),
+                     .tv_nsec = archive_entry_ctime_nsec(entry)}
+          : node->mtime;
+}
+
 }  // namespace
 
 Tree::NodesByPath::~NodesByPath() {
@@ -505,24 +537,20 @@ void Tree::ProcessEntry(Reader& r, std::string& path, Node* const local_root) {
     return;
   }
 
+  // Modification time to use as a fallback for entries that don't carry
+  // their own: the archive file's own mtime, or the current time if that
+  // isn't available.
+  timespec const fallback_mtime = current_archive->mtime.tv_sec != 0
+                                      ? current_archive->mtime
+                                      : timespec{.tv_sec = now_};
+
   // Is this entry a directory?
   if (ft == FileType::Directory) {
     assert(options_.dirs);
     Node* const node = GetOrCreateDirNode(path);
     assert(node);
 
-    if (archive_entry_mtime_is_set(e)) {
-      node->mtime = {.tv_sec = archive_entry_mtime(e),
-                     .tv_nsec = archive_entry_mtime_nsec(e)};
-    }
-    if (archive_entry_atime_is_set(e)) {
-      node->atime = {.tv_sec = archive_entry_atime(e),
-                     .tv_nsec = archive_entry_atime_nsec(e)};
-    }
-    if (archive_entry_ctime_is_set(e)) {
-      node->ctime = {.tv_sec = archive_entry_ctime(e),
-                     .tv_nsec = archive_entry_ctime_nsec(e)};
-    }
+    SetTimestamps(node, e, fallback_mtime);
 
     if (options_.enforce_permissions) {
       node->uid = archive_entry_uid(e);
@@ -549,9 +577,6 @@ void Tree::ProcessEntry(Reader& r, std::string& path, Node* const local_root) {
   assert(parent->IsDir());
 
   Node::Ptr node(new Node{
-      .mtime = {.tv_sec = now_},
-      .atime = {.tv_sec = now_},
-      .ctime = {.tv_sec = now_},
       .index_within_archive = i,
       .descriptor = r.descriptor,
       .name = std::string(name),
@@ -561,18 +586,7 @@ void Tree::ProcessEntry(Reader& r, std::string& path, Node* const local_root) {
                                   (0666 & ~options_.fmask)),
   });
 
-  if (archive_entry_mtime_is_set(e)) {
-    node->mtime = {.tv_sec = archive_entry_mtime(e),
-                   .tv_nsec = archive_entry_mtime_nsec(e)};
-  }
-  if (archive_entry_atime_is_set(e)) {
-    node->atime = {.tv_sec = archive_entry_atime(e),
-                   .tv_nsec = archive_entry_atime_nsec(e)};
-  }
-  if (archive_entry_ctime_is_set(e)) {
-    node->ctime = {.tv_sec = archive_entry_ctime(e),
-                   .tv_nsec = archive_entry_ctime_nsec(e)};
-  }
+  SetTimestamps(node.get(), e, fallback_mtime);
 
   inode_count_ += 1;
   block_count_ += 1;
@@ -683,6 +697,11 @@ void Tree::Load(std::span<const std::string> const archives) {
         archive.size = z.st_size;
         LOG(DEBUG) << "File size of " << Path(archive.path) << " is "
                    << archive.size << " bytes";
+#if __APPLE__
+        archive.mtime = z.st_mtimespec;
+#else
+        archive.mtime = z.st_mtim;
+#endif
       }
     } catch (ExitCode const error) {
       archive.fd.Close();

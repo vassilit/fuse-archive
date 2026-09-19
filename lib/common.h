@@ -19,6 +19,7 @@
 #include <archive_entry.h>
 #include <sys/types.h>
 
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -87,6 +88,10 @@ struct ArchiveDescriptor {
 
   // Size of this archive file.
   i64 size = 0;
+
+  // Modification time of this archive file. Used as a fallback for archive
+  // entries that don't carry their own modification time.
+  timespec mtime = {};
 
   // Format of this archive.
   ArchiveFormat format = ArchiveFormat::NONE;

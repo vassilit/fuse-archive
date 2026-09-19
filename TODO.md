@@ -77,7 +77,7 @@
 - [x] Add a `-o memcache` option.
 - [x] Fix the FUSE version detection in the tests
 - [x] Improve tests for RPM format.
-- [ ] Improve handling of zero or missing timestamps.
+- [x] Improve handling of zero or missing timestamps.
 - [ ] Handle btime timestamps.
 - [ ] Keep track of access time (atime) of each file.
 - [ ] Add a `-o noatime` option.

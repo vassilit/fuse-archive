@@ -551,25 +551,45 @@ def TestArchiveWithOptions(options=[]):
         'romeo.txt': {'mode': '-rw-r--r--', 'size': 942, 'md5': '80f1521c4533d017df063c623b75cde3'},
     }
 
+    zip_names = []
+
+    if has_bz2lib:
+        zip_names += ['romeo.bzip2.zip']
+
+    if has_liblzma:
+        zip_names += ['romeo.lzma.zip', 'romeo.xz.zip']
+
+    for zip_name in zip_names:
+        MountArchiveAndCheckTree(zip_name, want_tree, options=options)
+
+    # The gzip format embeds its own mtime in its header, so the mounted file
+    # should report that embedded timestamp, not the .gz file's own on-disk
+    # mtime.
+    want_tree['romeo.txt']['mtime'] = 1499322406000000000
+    zip_names = []
+
+    if has_zlib or has_gzip:
+        zip_names += ['romeo.txt.gz', 'romeo.txt.gzip']
+
+    for zip_name in zip_names:
+        MountArchiveAndCheckTree(zip_name, want_tree, options=options)
+
+    if has_zlib:
+        zip_name = 'romeo.txt.gz.uu'
+        MountArchiveAndCheckTree(zip_name, want_tree, options=[*options, '-o', 'maxfilters=2'])
+
+    # Other compression filters don't carry any timestamp at all, so the
+    # mounted file should fall back to the compressed file's own on-disk mtime.
     zip_names = ['romeo.txt.uu']
 
     if has_liblzma or has_lzip:
         zip_names += ['romeo.txt.lz', 'romeo.txt.lzip']
 
-    if has_zlib or has_gzip:
-        zip_names += ['romeo.txt.gz', 'romeo.txt.gzip']
-
     if has_bz2lib or has_bzip2:
         zip_names += ['romeo.txt.bz2', 'romeo.txt.bz', 'romeo.txt.bzip2']
 
-    if has_bz2lib:
-        zip_names += ['romeo.bzip2.zip']
-
     if has_liblz4 or has_lz4:
         zip_names += ['romeo.txt.lz4']
-
-    if has_liblzma:
-        zip_names += ['romeo.lzma.zip', 'romeo.xz.zip']
 
     if has_liblzma or has_lzma:
         zip_names += ['romeo.txt.lzma']
@@ -599,12 +619,9 @@ def TestArchiveWithOptions(options=[]):
         zip_names += ['romeo.txt.gpg', 'romeo.txt.pgp', 'romeo.txt.asc']
 
     for zip_name in zip_names:
+        want_tree['romeo.txt']['mtime'] = os.stat(os.path.join(script_dir, 'data', zip_name)).st_mtime_ns
         MountArchiveAndCheckTree(zip_name, want_tree, options=options)
 
-    if has_zlib:
-        MountArchiveAndCheckTree('romeo.txt.gz.uu',
-                                 want_tree,
-                                 options=[*options, '-o', 'maxfilters=2'])
 
     want_tree = {
         '.': {'ino': 1, 'mode': 'drwxr-xr-x', 'nlink': 4},
@@ -671,14 +688,14 @@ def TestArchiveWithOptions(options=[]):
 
     want_tree = {
         '.': {'ino': 1, 'mode': 'drwxr-xr-x', 'nlink': 2},
-        '0.bytes': {'mode': '-rw-r--r--', 'size': 0, 'md5': 'd41d8cd98f00b204e9800998ecf8427e'},
-        'github-tags.json': {'mode': '-rw-r--r--', 'size': 853, 'md5': 'b2d7993ed99c65296bf95824c57b4fdc'},
-        'hello.sh': {'mode': '-rw-r--r--', 'size': 693, 'md5': '72d710dd3766a67401a79f8d3df3114c'},
-        'αβ.txt': {'mode': '-rw-r--r--', 'size': 104, 'md5': '3369a4163a436de59e23daedd371b5f0'},
-        '😻.txt': {'mode': '-rw-r--r--', 'size': 151, 'md5': '5d18e0e461374191825c6e7898af5634'},
-        'pjw-thumbnail.png': {'mode': '-rw-r--r--', 'size': 208, 'md5': 'f7017e60a0af6d7ad3128c149624aac5'},
-        'romeo.txt': {'mode': '-rw-r--r--', 'size': 942, 'md5': '80f1521c4533d017df063c623b75cde3'},
-        'romeo.txt.gz': {'mode': '-rw-r--r--', 'size': 558, 'md5': 'f261bc929b34f58d8138413ed6252f2d'},
+        '0.bytes': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 0, 'md5': 'd41d8cd98f00b204e9800998ecf8427e'},
+        'github-tags.json': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 853, 'md5': 'b2d7993ed99c65296bf95824c57b4fdc'},
+        'hello.sh': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 693, 'md5': '72d710dd3766a67401a79f8d3df3114c'},
+        'αβ.txt': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 104, 'md5': '3369a4163a436de59e23daedd371b5f0'},
+        '😻.txt': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 151, 'md5': '5d18e0e461374191825c6e7898af5634'},
+        'pjw-thumbnail.png': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 208, 'md5': 'f7017e60a0af6d7ad3128c149624aac5'},
+        'romeo.txt': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 942, 'md5': '80f1521c4533d017df063c623b75cde3'},
+        'romeo.txt.gz': {'mode': '-rw-r--r--', 'mtime': 0, 'size': 558, 'md5': 'f261bc929b34f58d8138413ed6252f2d'},
     }
 
     zip_names = ['archive.a', 'archive.ar']
