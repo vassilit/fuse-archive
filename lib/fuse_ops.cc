@@ -30,6 +30,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -326,6 +327,12 @@ int Read(const char*,
   Node* const t = node->GetTarget();
   assert(t);
 
+  if (GetTree().GetOptions().atime) {
+    timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    t->atime.store(now, std::memory_order_relaxed);
+  }
+
   i64 const size = t->size;
   assert(size >= 0);
 
@@ -462,7 +469,7 @@ int Release(const char*, fuse_file_info* const fi) {
 int OpenDir(const char* const path, fuse_file_info* const fi) {
   assert(path);
 
-  const Node* const n = FindNode(path);
+  Node* const n = FindNode(path);
   if (!n) {
     LOG(ERROR) << "Cannot open " << Path(path) << ": No such item";
     return -ENOENT;
@@ -498,9 +505,15 @@ int ReadDir(const char*,
   assert(filler);
   assert(fi);
 
-  const Node* const n = reinterpret_cast<const Node*>(fi->fh);
+  Node* const n = reinterpret_cast<Node*>(fi->fh);
   assert(n);
   assert(n->IsDir());
+
+  if (GetTree().GetOptions().atime) {
+    timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    n->atime.store(now, std::memory_order_relaxed);
+  }
 
 #if FUSE_USE_VERSION >= 30
   const bool plus = (flags & FUSE_READDIR_PLUS) != 0;

@@ -31,11 +31,14 @@ ifeq ($(shell uname -s),Darwin)
   endif
 else
   COMMON_CXXFLAGS += -std=c++23
+  # 16-byte atomics (std::atomic<timespec>, used for Node::atime) are
+  # implemented via libatomic's runtime fallback on platforms without a
+  # lock-free 16-byte compare-and-swap.
+  PKG_LDFLAGS += -latomic
 endif
 
-
-PKG_CXXFLAGS := $(shell $(PKG_CONFIG) --cflags $(DEPS) 2>/dev/null)
-PKG_LDFLAGS := $(shell $(PKG_CONFIG) --libs $(DEPS) 2>/dev/null)
+PKG_CXXFLAGS += $(shell $(PKG_CONFIG) --cflags $(DEPS) 2>/dev/null)
+PKG_LDFLAGS += $(shell $(PKG_CONFIG) --libs $(DEPS) 2>/dev/null)
 
 HAS_GTEST := $(shell $(PKG_CONFIG) --exists $(UNIT_TEST_DEPS) 2>/dev/null && echo yes || echo no)
 

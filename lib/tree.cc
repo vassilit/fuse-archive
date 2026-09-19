@@ -304,7 +304,7 @@ Node* Tree::GetOrCreateDirNode(std::string_view path) {
     const Segment& segment = segments[i];
     Node::Ptr child(new Node{
         .mtime = {.tv_sec = now_},
-        .atime = {.tv_sec = now_},
+        .atime = timespec{.tv_sec = now_},
         .ctime = {.tv_sec = now_},
         .path_length = segment.path_length,
         .path_hash = segment.path_hash,
@@ -379,7 +379,7 @@ void Tree::ResolveHardlinks() {
     // Create the node for this entry.
     Node::Ptr node(new Node{
         .mtime = target->mtime,
-        .atime = target->atime,
+        .atime = target->atime.load(std::memory_order_relaxed),
         .ctime = target->ctime,
         .index_within_archive = target->index_within_archive,
         .ino = target->ino,
@@ -717,7 +717,7 @@ void Tree::Load(std::span<const std::string> const archives) {
   {
     Node::Ptr root(new Node{
         .mtime = {.tv_sec = now_},
-        .atime = {.tv_sec = now_},
+        .atime = timespec{.tv_sec = now_},
         .ctime = {.tv_sec = now_},
         .name = "/",
         .uid = uid_,
@@ -780,7 +780,7 @@ void Tree::Load(std::span<const std::string> const archives) {
         // Create a directory node for this archive.
         Node::Ptr archive_node(new Node{
             .mtime = {.tv_sec = now_},
-            .atime = {.tv_sec = now_},
+            .atime = timespec{.tv_sec = now_},
             .ctime = {.tv_sec = now_},
             .name = archive.name_without_extension,
             .uid = uid_,
@@ -896,7 +896,8 @@ void Tree::Trim(Node& a) {
   a.gid = p->gid;
   a.mode = p->mode;
   a.size = p->size;
-  a.atime = p->atime;
+  a.atime.store(p->atime.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
   a.mtime = p->mtime;
   a.ctime = p->ctime;
   a.nlink = p->nlink;

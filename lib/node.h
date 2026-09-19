@@ -56,7 +56,14 @@ struct Node {
   // --- 16-byte members (Highest alignment) ---
 
   timespec mtime;
-  timespec atime;
+
+  // Time of last access. Unlike mtime/ctime, this is updated after construction
+  // (on every read()/readdir(), unless -o noatime is set), potentially from
+  // multiple FUSE worker threads at once, e.g. concurrent reads of the same
+  // file, or of different hardlinks sharing this Node as their target. Hence
+  // the atomic, to avoid a data race on the plain struct.
+  std::atomic<timespec> atime;
+
   timespec ctime;
 
   // --- 8-byte members (Fixed size) ---

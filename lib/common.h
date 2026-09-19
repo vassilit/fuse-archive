@@ -51,6 +51,7 @@ struct Options {
   int holes = 1;
   int hardlinks = 1;
   int xattrs = 1;
+  int atime = 1;
   int bidding = 1;
   int enforce_permissions = 0;
 

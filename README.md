@@ -101,6 +101,10 @@ numeric suffix (e.g., `archive (1)`).
 **-o noxattrs**
 :   Do not report extended attributes.
 
+**-o noatime**
+:   Do not update the access time (atime) of files and directories when they
+    are read.
+
 **-o nobidding**
 :   Do not use libarchive's format bidding system to detect the archive format.
     Instead, strictly rely on the file extension.

@@ -122,7 +122,9 @@ off_t Node::SparseSeek(off_t const offset, int const whence) const {
 Stat Node::GetStat() const {
   Stat z = {};
   assert((nlink == 0) == (hardlink_target != nullptr));
-  z.st_nlink = GetTarget()->nlink;
+  const Node* const t = GetTarget();
+  assert(t);
+  z.st_nlink = t->nlink;
   assert(z.st_nlink > 0);
   z.st_ino = ino;
   z.st_mode = mode;
@@ -132,6 +134,8 @@ Stat Node::GetStat() const {
   z.st_blksize = block_size;
   z.st_blocks = GetBlockCount();
   z.st_rdev = dev;
+
+  const timespec atime = t->atime.load(std::memory_order_relaxed);
 
 #if __APPLE__
   z.st_atimespec = atime;

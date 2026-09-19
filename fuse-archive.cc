@@ -125,6 +125,7 @@ fuse_opt const g_fuse_opts[] = {
     {"noholes", offsetof(Context, options.holes), 0},
     {"nohardlinks", offsetof(Context, options.hardlinks), 0},
     {"noxattrs", offsetof(Context, options.xattrs), 0},
+    {"noatime", offsetof(Context, options.atime), 0},
     {"nobidding", offsetof(Context, options.bidding), 0},
     {"noexternal", offsetof(Context, can_use_external_filters), 0},
     {"enforce_permissions", offsetof(Context, options.enforce_permissions), 1},
@@ -245,6 +246,7 @@ general options:
     -o noholes             no sparse files
     -o nohardlinks         no hard links
     -o noxattrs            no extended attributes
+    -o noatime             don't update access times
     -o nobidding           rely on file extension to detect archive format
     -o noexternal          do not use external programs for decompression
     -o enforce_permissions enforce standard UNIX permissions
